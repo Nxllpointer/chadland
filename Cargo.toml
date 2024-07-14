@@ -1,0 +1,11 @@
+[package]
+name = "chadland"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+smithay.git = "https://github.com/Smithay/smithay.git"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+anyhow = "1.0.86"
+paste = "1.0.15"
