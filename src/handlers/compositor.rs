@@ -4,7 +4,7 @@ use smithay::{reexports::wayland_server::protocol::wl_surface::WlSurface, waylan
 
 use crate::ClientState;
 
-impl CompositorHandler for crate::State {
+impl<B: crate::Backend> CompositorHandler for crate::App<B> {
     fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
         &mut self.wl.compositor
     }
@@ -20,7 +20,7 @@ impl CompositorHandler for crate::State {
     }
 
     fn commit(&mut self, surface: &WlSurface) {
-        smithay::backend::renderer::utils::on_commit_buffer_handler::<crate::State>(surface);
+        smithay::backend::renderer::utils::on_commit_buffer_handler::<crate::App<B>>(surface);
         if !wayland::compositor::is_sync_subsurface(surface) {
             let root_surface = get_root_surface(surface);
             if let Some(window) = find_window(&root_surface, &self.space) {

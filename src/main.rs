@@ -1,7 +1,5 @@
-use chadland::Options;
-
-fn main() -> anyhow::Result<()> {
+fn main() {
     tracing_subscriber::fmt().init();
 
-    chadland::run(Options {})
+    chadland::run::<chadland::backends::winit::WinitBackend>();
 }

@@ -6,20 +6,21 @@ mod seat;
 mod shm;
 mod xdg_shell;
 
-/// Run `delegate_xxxx!` with the arguments being provided automatically
-macro_rules! chadland_delegate {
+/// Run `delegate_xxxx!` for each argument disregarding the backend type
+macro_rules! delegate_for_all_backends {
     ($($macro_name:ident)*) => {
+        use crate::Backend;
         $(
             paste::paste! {
-               [<delegate_ $macro_name>]!(crate::State);
+               [<delegate_ $macro_name>]!(@<B: Backend> crate::App<B>);
             }
         )*
     };
 }
-chadland_delegate!(
+delegate_for_all_backends!(
     compositor
-    shm
     output
     seat
+    shm
     xdg_shell
 );

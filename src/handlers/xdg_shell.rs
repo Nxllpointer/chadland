@@ -1,6 +1,6 @@
 use smithay::{desktop, wayland::shell::xdg::XdgShellHandler};
 
-impl XdgShellHandler for crate::State {
+impl<B: crate::Backend> XdgShellHandler for crate::App<B> {
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
         &mut self.wl.xdg_shell
     }

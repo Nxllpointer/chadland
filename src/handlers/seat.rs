@@ -1,7 +1,7 @@
 use smithay::input;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 
-impl input::SeatHandler for crate::State {
+impl<B: crate::Backend> input::SeatHandler for crate::App<B> {
     type KeyboardFocus = WlSurface;
     type PointerFocus = WlSurface;
     type TouchFocus = WlSurface;

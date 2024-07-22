@@ -1,35 +1,41 @@
-use calloop::EventLoop;
 use smithay::reexports::*;
 
 //
 
-mod handlers;
-mod socket;
-mod state;
-mod winit;
+pub mod backends;
+pub mod handlers;
+pub mod socket;
+pub mod state;
 
+pub use backends::Backend;
 pub use state::*;
 
-pub struct Options {}
-
-pub struct LoopData {
-    state: crate::State,
-    display: wayland_server::Display<crate::State>,
+pub struct LoopData<B: crate::Backend> {
+    pub app: crate::App<B>,
+    pub display: wayland_server::Display<crate::App<B>>,
 }
 
-pub fn run(_options: Options) -> anyhow::Result<()> {
-    let mut event_loop: EventLoop<LoopData> = calloop::EventLoop::try_new()?;
-    let loop_handle = event_loop.handle();
-    let mut display: wayland_server::Display<crate::State> = wayland_server::Display::new()?;
-    let display_handle = display.handle();
+pub fn run<B: crate::Backend<SelfType = B>>() {
+    let mut event_loop: calloop::EventLoop<crate::LoopData<B>> =
+        calloop::EventLoop::try_new().expect("Unable to create event loop");
+    let display: wayland_server::Display<crate::App<B>> =
+        wayland_server::Display::new().expect("Unable to create wayland display");
+    let backend = B::new();
 
-    let mut state = crate::State::new(&display_handle, event_loop.get_signal());
+    let app = crate::App::new(display.handle(), event_loop.get_signal(), backend);
+    let mut loop_data = crate::LoopData { app, display };
 
-    crate::socket::init_socket(&loop_handle, &mut display)?;
-    crate::winit::init_winit(&loop_handle, &display_handle, &mut state)?;
+    B::init(&event_loop.handle(), &mut loop_data.app);
 
-    let mut loop_data = LoopData { state, display };
-    event_loop.run(None, &mut loop_data, |_| {})?;
+    crate::socket::init_socket(&event_loop.handle(), &mut loop_data.display);
 
-    Ok(())
+    event_loop
+        .run(None, &mut loop_data, |data| {
+            data.app.space.refresh();
+            data.app
+                .display_handle
+                .flush_clients()
+                .expect("Unable to flush clients");
+        })
+        .expect("Error while running event loop");
 }

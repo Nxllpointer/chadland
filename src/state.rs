@@ -4,41 +4,46 @@ use smithay::{
     wayland::{self, shm::ShmState},
 };
 
-pub struct WaylandState {
+pub struct WaylandState<B: crate::Backend> {
     pub compositor: wayland::compositor::CompositorState,
-    pub seat: input::SeatState<State>,
+    pub seat: input::SeatState<App<B>>,
     pub shm: ShmState,
     pub xdg_shell: wayland::shell::xdg::XdgShellState,
 }
 
-pub struct State {
+pub struct App<B: crate::Backend> {
+    pub display_handle: wayland_server::DisplayHandle,
     pub loop_signal: calloop::LoopSignal,
 
+    pub backend: B,
+
+    pub wl: WaylandState<B>,
+
     pub start_time: std::time::Instant,
-
-    pub wl: WaylandState,
-
     pub seat: input::Seat<Self>,
     pub space: desktop::Space<desktop::Window>,
 }
 
-impl State {
+impl<B: crate::Backend> App<B> {
     pub fn new(
-        display_handle: &wayland_server::DisplayHandle,
+        display_handle: wayland_server::DisplayHandle,
         loop_signal: calloop::LoopSignal,
+        backend: B,
     ) -> Self {
         let mut wl = WaylandState {
-            compositor: wayland::compositor::CompositorState::new::<Self>(display_handle),
+            compositor: wayland::compositor::CompositorState::new::<Self>(&display_handle),
             seat: input::SeatState::new(),
-            shm: ShmState::new::<Self>(display_handle, []),
-            xdg_shell: wayland::shell::xdg::XdgShellState::new::<Self>(display_handle),
+            shm: ShmState::new::<Self>(&display_handle, []),
+            xdg_shell: wayland::shell::xdg::XdgShellState::new::<Self>(&display_handle),
         };
 
         Self {
             loop_signal,
+            backend,
             start_time: std::time::Instant::now(),
-            seat: wl.seat.new_wl_seat(display_handle, "default"),
+            seat: wl.seat.new_wl_seat(&display_handle, "default"),
             space: desktop::Space::default(),
+            display_handle,
             wl,
         }
     }

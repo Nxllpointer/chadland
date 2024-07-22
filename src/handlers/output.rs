@@ -1,3 +1,3 @@
 use smithay::wayland::output::OutputHandler;
 
-impl OutputHandler for crate::State {}
+impl<B: crate::Backend> OutputHandler for crate::App<B> {}
