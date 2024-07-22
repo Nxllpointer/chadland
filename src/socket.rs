@@ -9,6 +9,7 @@ use smithay::{
 };
 use tracing::error;
 
+/// Create and initialize the wayland socket
 pub fn init_socket<B: crate::Backend>(
     loop_handle: &calloop::LoopHandle<crate::LoopData<B>>,
     display: &mut wayland_server::Display<crate::App<B>>,

@@ -15,6 +15,7 @@ pub struct LoopData<B: crate::Backend> {
     pub display: wayland_server::Display<crate::App<B>>,
 }
 
+/// Run the compositor using the specified [crate::Backend]
 pub fn run<B: crate::Backend<SelfType = B>>() {
     let mut event_loop: calloop::EventLoop<crate::LoopData<B>> =
         calloop::EventLoop::try_new().expect("Unable to create event loop");
