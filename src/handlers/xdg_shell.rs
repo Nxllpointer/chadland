@@ -2,12 +2,12 @@ use smithay::{desktop, wayland::shell::xdg::XdgShellHandler};
 
 impl<B: crate::Backend> XdgShellHandler for crate::App<B> {
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
-        &mut self.wl.xdg_shell
+        &mut self.common.wl.xdg_shell
     }
 
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         let window = desktop::Window::new_wayland_window(surface);
-        self.space.map_element(window, (0, 0), true);
+        self.common.space.map_element(window, (0, 0), true);
     }
 
     fn new_popup(

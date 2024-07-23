@@ -4,7 +4,6 @@ use smithay::{
         gles::GlesRenderer,
     },
     desktop, output,
-    reexports::calloop,
 };
 
 pub struct WinitBackend;
@@ -12,14 +11,7 @@ pub struct WinitBackend;
 impl super::Backend for WinitBackend {
     type SelfType = WinitBackend;
 
-    fn new() -> Self {
-        Self {}
-    }
-
-    fn init(
-        loop_handle: &calloop::LoopHandle<crate::LoopData<Self::SelfType>>,
-        app: &mut crate::App<Self::SelfType>,
-    ) {
+    fn new(common: &mut crate::state::Common<Self::SelfType>) -> Self {
         let (mut graphics_backend, winit_source) =
             smithay::backend::winit::init::<GlesRenderer>().expect("Unable to initialize winit");
 
@@ -38,7 +30,7 @@ impl super::Backend for WinitBackend {
             refresh: 60_000,
         };
 
-        output.create_global::<crate::App<WinitBackend>>(&app.display_handle);
+        output.create_global::<crate::App<WinitBackend>>(&common.display_handle);
         output.change_current_state(
             Some(mode),
             Some(smithay::utils::Transform::Flipped180),
@@ -47,12 +39,13 @@ impl super::Backend for WinitBackend {
         );
         output.set_preferred(mode);
 
-        app.space.map_output(&output, (0, 0));
+        common.space.map_output(&output, (0, 0));
 
         let mut damage_tracker = OutputDamageTracker::from_output(&output);
 
-        loop_handle
-            .insert_source(winit_source, move |event, _, data| match event {
+        common
+            .loop_handle
+            .insert_source(winit_source, move |event, _, app| match event {
                 smithay::backend::winit::WinitEvent::Resized {
                     size,
                     scale_factor: _,
@@ -70,7 +63,9 @@ impl super::Backend for WinitBackend {
                 ),
                 smithay::backend::winit::WinitEvent::Focus(_) => {}
                 smithay::backend::winit::WinitEvent::Input(_) => {}
-                smithay::backend::winit::WinitEvent::CloseRequested => data.app.loop_signal.stop(),
+                smithay::backend::winit::WinitEvent::CloseRequested => {
+                    app.common.loop_signal.stop()
+                }
                 smithay::backend::winit::WinitEvent::Redraw => {
                     graphics_backend.bind().unwrap();
 
@@ -84,7 +79,7 @@ impl super::Backend for WinitBackend {
                         graphics_backend.renderer(),
                         1.0,
                         0,
-                        [&data.app.space],
+                        [&app.common.space],
                         &[],
                         &mut damage_tracker,
                         [1.0, 0.0, 1.0, 1.0],
@@ -94,10 +89,10 @@ impl super::Backend for WinitBackend {
                     .map(|d| d.as_slice());
 
                     graphics_backend.submit(damage).unwrap();
-                    data.app.space.elements().for_each(|window| {
+                    app.common.space.elements().for_each(|window| {
                         window.send_frame(
                             &output,
-                            data.app.start_time.elapsed(),
+                            app.common.start_time.elapsed(),
                             Some(std::time::Duration::ZERO),
                             |_, _| Some(output.clone()),
                         )
@@ -108,5 +103,7 @@ impl super::Backend for WinitBackend {
                 }
             })
             .expect("Unable to insert winit event source");
+
+        Self {}
     }
 }

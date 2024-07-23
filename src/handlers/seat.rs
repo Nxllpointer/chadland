@@ -7,6 +7,6 @@ impl<B: crate::Backend> input::SeatHandler for crate::App<B> {
     type TouchFocus = WlSurface;
 
     fn seat_state(&mut self) -> &mut input::SeatState<Self> {
-        &mut self.wl.seat
+        &mut self.common.wl.seat
     }
 }

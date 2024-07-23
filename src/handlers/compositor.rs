@@ -2,11 +2,9 @@ use smithay::desktop::Space;
 use smithay::wayland::compositor::CompositorHandler;
 use smithay::{reexports::wayland_server::protocol::wl_surface::WlSurface, wayland};
 
-use crate::ClientState;
-
 impl<B: crate::Backend> CompositorHandler for crate::App<B> {
     fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
-        &mut self.wl.compositor
+        &mut self.common.wl.compositor
     }
 
     fn client_compositor_state<'a>(
@@ -14,7 +12,7 @@ impl<B: crate::Backend> CompositorHandler for crate::App<B> {
         client: &'a smithay::reexports::wayland_server::Client,
     ) -> &'a smithay::wayland::compositor::CompositorClientState {
         &client
-            .get_data::<ClientState>()
+            .get_data::<crate::state::ClientState>()
             .expect("Client has no ClientState")
             .compositor_client_state
     }
@@ -23,7 +21,7 @@ impl<B: crate::Backend> CompositorHandler for crate::App<B> {
         smithay::backend::renderer::utils::on_commit_buffer_handler::<crate::App<B>>(surface);
         if !wayland::compositor::is_sync_subsurface(surface) {
             let root_surface = get_root_surface(surface);
-            if let Some(window) = find_window(&root_surface, &self.space) {
+            if let Some(window) = find_window(&root_surface, &self.common.space) {
                 window.on_commit();
                 window.toplevel().unwrap().send_pending_configure(); //TODO Is it ok to send this every commit?
             };

@@ -11,20 +11,21 @@ use tracing::error;
 
 /// Create and initialize the wayland socket
 pub fn init_socket<B: crate::Backend>(
-    loop_handle: &calloop::LoopHandle<crate::LoopData<B>>,
-    display: &mut wayland_server::Display<crate::App<B>>,
+    app: &mut crate::App<B>,
+    mut display: wayland_server::Display<crate::App<B>>,
 ) {
     let listening_socket =
         ListeningSocketSource::new_auto().expect("Unable to create wayland socket");
 
-    loop_handle
-        .insert_source(listening_socket, |client, _, data| {
+    app.common
+        .loop_handle
+        .insert_source(listening_socket, |client, _, app| {
             let client_dbg = format!("{client:?}");
 
-            if let Err(err) = data
-                .display
-                .handle()
-                .insert_client(client, Arc::new(crate::ClientState::default()))
+            if let Err(err) = app
+                .common
+                .display_handle
+                .insert_client(client, Arc::new(crate::state::ClientState::default()))
             {
                 error!("Unable to insert client into display!");
                 error!("Client: {client_dbg}");
@@ -43,9 +44,10 @@ pub fn init_socket<B: crate::Backend>(
         calloop::Mode::Level,
     );
 
-    loop_handle
-        .insert_source(poll_source, |_, _, data| {
-            data.display.dispatch_clients(&mut data.app)?;
+    app.common
+        .loop_handle
+        .insert_source(poll_source, move |_, _, app| {
+            display.dispatch_clients(app)?;
             Ok(calloop::PostAction::Continue)
         })
         .expect("Unable to insert poll-fd source");

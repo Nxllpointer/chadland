@@ -4,6 +4,23 @@ use smithay::{
     wayland::{self, shm::ShmState},
 };
 
+pub struct App<B: crate::Backend> {
+    pub common: Common<B>,
+    pub backend: B,
+}
+
+pub struct Common<B: crate::Backend> {
+    pub display_handle: wayland_server::DisplayHandle,
+    pub loop_handle: calloop::LoopHandle<'static, crate::App<B>>,
+    pub loop_signal: calloop::LoopSignal,
+
+    pub wl: WaylandState<B>,
+
+    pub start_time: std::time::Instant,
+    pub seat: input::Seat<App<B>>,
+    pub space: desktop::Space<desktop::Window>,
+}
+
 pub struct WaylandState<B: crate::Backend> {
     pub compositor: wayland::compositor::CompositorState,
     pub seat: input::SeatState<App<B>>,
@@ -11,40 +28,29 @@ pub struct WaylandState<B: crate::Backend> {
     pub xdg_shell: wayland::shell::xdg::XdgShellState,
 }
 
-pub struct App<B: crate::Backend> {
-    pub display_handle: wayland_server::DisplayHandle,
-    pub loop_signal: calloop::LoopSignal,
-
-    pub backend: B,
-
-    pub wl: WaylandState<B>,
-
-    pub start_time: std::time::Instant,
-    pub seat: input::Seat<Self>,
-    pub space: desktop::Space<desktop::Window>,
-}
-
-impl<B: crate::Backend> App<B> {
+impl<B: crate::Backend> Common<B> {
     pub fn new(
         display_handle: wayland_server::DisplayHandle,
+        loop_handle: calloop::LoopHandle<'static, App<B>>,
         loop_signal: calloop::LoopSignal,
-        backend: B,
     ) -> Self {
         let mut wl = WaylandState {
-            compositor: wayland::compositor::CompositorState::new::<Self>(&display_handle),
+            compositor: wayland::compositor::CompositorState::new::<App<B>>(&display_handle),
             seat: input::SeatState::new(),
-            shm: ShmState::new::<Self>(&display_handle, []),
-            xdg_shell: wayland::shell::xdg::XdgShellState::new::<Self>(&display_handle),
+            shm: ShmState::new::<App<B>>(&display_handle, []),
+            xdg_shell: wayland::shell::xdg::XdgShellState::new::<App<B>>(&display_handle),
         };
 
+        let seat = wl.seat.new_wl_seat(&display_handle, "default");
+
         Self {
-            loop_signal,
-            backend,
-            start_time: std::time::Instant::now(),
-            seat: wl.seat.new_wl_seat(&display_handle, "default"),
-            space: desktop::Space::default(),
             display_handle,
+            loop_handle,
+            loop_signal,
             wl,
+            start_time: std::time::Instant::now(),
+            seat,
+            space: desktop::Space::default(),
         }
     }
 }

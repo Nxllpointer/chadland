@@ -1,5 +1,3 @@
-use smithay::reexports::calloop;
-
 pub mod winit;
 
 /// Trait for handling input and output
@@ -8,10 +6,5 @@ pub trait Backend: 'static {
     /// The struct implementing this trait. Required for [crate::run<Backend>] to work
     type SelfType: Backend;
 
-    fn new() -> Self;
-
-    fn init(
-        loop_handle: &calloop::LoopHandle<crate::LoopData<Self::SelfType>>,
-        app: &mut crate::App<Self::SelfType>,
-    );
+    fn new(common: &mut crate::state::Common<Self::SelfType>) -> Self;
 }
