@@ -1,7 +1,7 @@
 use smithay::{
     desktop, input,
     reexports::{calloop, wayland_server},
-    wayland::{self, shm::ShmState},
+    wayland,
 };
 
 pub struct App<B: crate::Backend> {
@@ -24,8 +24,9 @@ pub struct Common<B: crate::Backend> {
 pub struct WaylandState<B: crate::Backend> {
     pub compositor: wayland::compositor::CompositorState,
     pub seat: input::SeatState<App<B>>,
-    pub shm: ShmState,
+    pub shm: wayland::shm::ShmState,
     pub xdg_shell: wayland::shell::xdg::XdgShellState,
+    pub dmabuf: wayland::dmabuf::DmabufState,
 }
 
 impl<B: crate::Backend> Common<B> {
@@ -37,8 +38,9 @@ impl<B: crate::Backend> Common<B> {
         let mut wl = WaylandState {
             compositor: wayland::compositor::CompositorState::new::<App<B>>(&display_handle),
             seat: input::SeatState::new(),
-            shm: ShmState::new::<App<B>>(&display_handle, []),
+            shm: wayland::shm::ShmState::new::<App<B>>(&display_handle, []),
             xdg_shell: wayland::shell::xdg::XdgShellState::new::<App<B>>(&display_handle),
+            dmabuf: wayland::dmabuf::DmabufState::new(),
         };
 
         let seat = wl.seat.new_wl_seat(&display_handle, "default");

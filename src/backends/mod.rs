@@ -1,3 +1,5 @@
+use smithay::{backend::allocator, wayland::dmabuf::DmabufFeedback};
+
 pub mod winit;
 
 /// Trait for handling input and output
@@ -7,4 +9,8 @@ pub trait Backend: 'static {
     type SelfType: Backend;
 
     fn new(common: &mut crate::state::Common<Self::SelfType>) -> Self;
+
+    fn default_dmabuf_feedback(&mut self) -> Option<DmabufFeedback>;
+    fn dmabuf_formats(&mut self) -> allocator::format::FormatSet;
+    fn import_dmabuf(&mut self, dmabuf: &allocator::dmabuf::Dmabuf) -> Result<(), ()>;
 }
