@@ -31,7 +31,7 @@ impl<B: crate::Backend> CompositorHandler for crate::App<B> {
 
 /// Returns the root parent [WlSurface]
 fn get_root_surface(surface: &WlSurface) -> WlSurface {
-    if let Some(parent) = wayland::compositor::get_parent(&surface) {
+    if let Some(parent) = wayland::compositor::get_parent(surface) {
         get_root_surface(&parent)
     } else {
         surface.clone()
@@ -45,6 +45,6 @@ fn find_window(
 ) -> Option<smithay::desktop::Window> {
     space
         .elements()
-        .find(|window| window.toplevel().map(|s| s.wl_surface()) == Some(&surface))
-        .map(|w| w.clone())
+        .find(|window| window.toplevel().map(|s| s.wl_surface()) == Some(surface))
+        .cloned()
 }
