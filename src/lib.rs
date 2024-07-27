@@ -6,6 +6,7 @@ pub mod backends;
 pub mod handlers;
 pub mod socket;
 pub mod state;
+pub mod util;
 
 pub use backends::Backend;
 pub use state::App;
