@@ -1,5 +1,7 @@
-use smithay::wayland::compositor::CompositorHandler;
-use smithay::{reexports::wayland_server::protocol::wl_surface::WlSurface, wayland};
+use smithay::{
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    wayland::compositor::CompositorHandler,
+};
 
 impl<B: crate::Backend> CompositorHandler for crate::App<B> {
     fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
