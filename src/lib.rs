@@ -1,5 +1,6 @@
 pub mod backends;
 pub mod handlers;
+pub mod input;
 pub mod socket;
 pub mod state;
 pub mod util;

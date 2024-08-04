@@ -13,8 +13,10 @@ impl<B: crate::Backend> XdgShellHandler for crate::App<B> {
     }
 
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+        let wl_surface = surface.wl_surface().clone();
         let window = desktop::Window::new_wayland_window(surface);
         self.common.space.map_element(window, (0, 0), true);
+        self.set_focus(wl_surface);
     }
 
     fn new_popup(

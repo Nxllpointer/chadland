@@ -33,9 +33,14 @@ impl super::Backend for WinitBackend {
         common
             .loop_handle
             .insert_source(event_source, |winit_event, _, app| {
-                Self::event_handler(winit_event, app)
+                app.event_handler(winit_event)
             })
             .expect("Unable to insert winit event source");
+
+        common
+            .seat
+            .add_keyboard(smithay::input::keyboard::XkbConfig::default(), 500, 100)
+            .expect("Unable to initialize keyboard");
 
         let output = output::Output::new(
             "winit".to_string(),
@@ -96,13 +101,13 @@ impl super::Backend for WinitBackend {
     }
 }
 
-impl WinitBackend {
-    fn event_handler(winit_event: WinitEvent, app: &mut WinitApp) {
+impl WinitApp {
+    fn event_handler(&mut self, winit_event: WinitEvent) {
         match winit_event {
             smithay::backend::winit::WinitEvent::Resized {
                 size,
                 scale_factor: _,
-            } => app.backend.output.change_current_state(
+            } => self.backend.output.change_current_state(
                 Some(output::Mode {
                     size,
                     refresh: REFRESH_RATE,
@@ -112,43 +117,45 @@ impl WinitBackend {
                 None,
             ),
             smithay::backend::winit::WinitEvent::Focus(_) => {}
-            smithay::backend::winit::WinitEvent::Input(_) => {}
-            smithay::backend::winit::WinitEvent::CloseRequested => app.common.loop_signal.stop(),
-            smithay::backend::winit::WinitEvent::Redraw => Self::render(app),
+            smithay::backend::winit::WinitEvent::Input(event) => {
+                self.process_input(crate::input::InputEvent::Basic(event));
+            }
+            smithay::backend::winit::WinitEvent::CloseRequested => self.common.loop_signal.stop(),
+            smithay::backend::winit::WinitEvent::Redraw => self.render(),
         }
     }
 
-    fn render(app: &mut WinitApp) {
-        app.backend.winit.bind().expect("Unable to bind backend");
+    fn render(&mut self) {
+        self.backend.winit.bind().expect("Unable to bind backend");
 
         let damage =
             desktop::space::render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
-                &app.backend.output,
-                app.backend.winit.renderer(),
+                &self.backend.output,
+                self.backend.winit.renderer(),
                 1.0,
                 0,
-                [&app.common.space],
+                [&self.common.space],
                 &[],
-                &mut app.backend.damage_tracker,
+                &mut self.backend.damage_tracker,
                 [1.0, 0.0, 1.0, 1.0],
             )
             .expect("Error rendering output")
             .damage
             .map(|d| d.as_slice());
 
-        app.backend.winit.submit(damage).unwrap();
+        self.backend.winit.submit(damage).unwrap();
 
-        app.common.space.elements().for_each(|window| {
+        self.common.space.elements().for_each(|window| {
             // TODO this *should* only be run for visible surfaces
             window.send_frame(
-                &app.backend.output,
-                app.common.start_time.elapsed(),
+                &self.backend.output,
+                self.common.start_time.elapsed(),
                 Some(std::time::Duration::ZERO),
-                |_, _| Some(app.backend.output.clone()),
+                |_, _| Some(self.backend.output.clone()),
             )
         });
 
         // Ask for redraw to schedule new frame.
-        app.backend.winit.window().request_redraw();
+        self.backend.winit.window().request_redraw();
     }
 }
