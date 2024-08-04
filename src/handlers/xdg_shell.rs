@@ -69,7 +69,7 @@ pub fn handle_commit<B: crate::Backend>(app: &mut crate::App<B>, surface: &WlSur
                 // Send the initial configure on the initial
                 // commit as required by the specification
                 top_level.send_configure();
-            } else if let None = initial_configure_pending {
+            } else if initial_configure_pending.is_none() {
                 error!("Unable to obtain XdgToplevelSurfaceData from top-level surface");
             }
         }
