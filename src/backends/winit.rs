@@ -1,3 +1,4 @@
+use std::time::Duration;
 use smithay::{
     backend::{
         allocator,
@@ -9,6 +10,7 @@ use smithay::{
         winit::{WinitEvent, WinitGraphicsBackend},
     },
     desktop, output,
+    reexports::calloop,
     wayland::dmabuf::DmabufFeedbackBuilder,
 };
 use tracing::error;
@@ -36,6 +38,18 @@ impl super::Backend for WinitBackend {
                 app.event_handler(winit_event)
             })
             .expect("Unable to insert winit event source");
+
+        let redraw_delay = Duration::from_millis(1000 / REFRESH_RATE as u64);
+        common
+            .loop_handle
+            .insert_source(
+                calloop::timer::Timer::from_duration(redraw_delay),
+                move |_, _, app| {
+                    app.event_handler(WinitEvent::Redraw);
+                    calloop::timer::TimeoutAction::ToDuration(redraw_delay)
+                },
+            )
+            .expect("Unable to insert redraw timer event source");
 
         common
             .seat
@@ -154,8 +168,5 @@ impl WinitApp {
                 |_, _| Some(self.backend.output.clone()),
             )
         });
-
-        // Ask for redraw to schedule new frame.
-        self.backend.winit.window().request_redraw();
     }
 }
