@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 smithay.git = "https://github.com/Smithay/smithay.git"
+smithay.features = ["backend_gbm_has_fd_for_plane"]
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 paste = "1.0.15"

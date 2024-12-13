@@ -31,7 +31,7 @@
               wayland
               udev
               libinput
-              libseat
+              seatd
               xwayland
               pixman
               libxkbcommon
