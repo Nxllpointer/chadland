@@ -35,6 +35,7 @@
               xwayland
               pixman
               libxkbcommon
+              fontconfig
           ];
 
           runtimeLibraries = with pkgs;
