@@ -1,4 +1,3 @@
-use std::time::Duration;
 use smithay::{
     backend::{
         allocator,
@@ -13,6 +12,7 @@ use smithay::{
     reexports::calloop,
     wayland::dmabuf::DmabufFeedbackBuilder,
 };
+use std::time::Duration;
 use tracing::error;
 
 const REFRESH_RATE: i32 = 60_000;
@@ -33,6 +33,7 @@ impl super::Backend for WinitBackend {
             smithay::backend::winit::init::<GlesRenderer>().expect("Unable to initialize winit");
 
         common
+            .comp
             .loop_handle
             .insert_source(event_source, |winit_event, _, app| {
                 app.event_handler(winit_event)
@@ -41,6 +42,7 @@ impl super::Backend for WinitBackend {
 
         let redraw_delay = Duration::from_millis(1000 / REFRESH_RATE as u64);
         common
+            .comp
             .loop_handle
             .insert_source(
                 calloop::timer::Timer::from_duration(redraw_delay),
@@ -52,6 +54,7 @@ impl super::Backend for WinitBackend {
             .expect("Unable to insert redraw timer event source");
 
         common
+            .comp
             .seat
             .add_keyboard(smithay::input::keyboard::XkbConfig::default(), 500, 100)
             .expect("Unable to initialize keyboard");
@@ -78,9 +81,9 @@ impl super::Backend for WinitBackend {
         );
         output.set_preferred(output.current_mode().expect("Output has no current mode"));
 
-        output.create_global::<WinitApp>(&common.display_handle);
+        output.create_global::<WinitApp>(&common.comp.display_handle);
 
-        common.space.map_output(&output, (0, 0));
+        common.comp.space.map_output(&output, (0, 0));
 
         let damage_tracker = OutputDamageTracker::from_output(&output);
 
@@ -134,7 +137,9 @@ impl WinitApp {
             smithay::backend::winit::WinitEvent::Input(event) => {
                 self.process_input(crate::input::InputEvent::Basic(event));
             }
-            smithay::backend::winit::WinitEvent::CloseRequested => self.common.loop_signal.stop(),
+            smithay::backend::winit::WinitEvent::CloseRequested => {
+                self.common.comp.loop_signal.stop()
+            }
             smithay::backend::winit::WinitEvent::Redraw => self.render(),
         }
     }
@@ -148,7 +153,7 @@ impl WinitApp {
                 self.backend.winit.renderer(),
                 1.0,
                 0,
-                [&self.common.space],
+                [&self.common.comp.space],
                 &[],
                 &mut self.backend.damage_tracker,
                 [1.0, 0.0, 1.0, 1.0],
@@ -159,11 +164,11 @@ impl WinitApp {
 
         self.backend.winit.submit(damage).unwrap();
 
-        self.common.space.elements().for_each(|window| {
+        self.common.comp.space.elements().for_each(|window| {
             // TODO this *should* only be run for visible surfaces
             window.send_frame(
                 &self.backend.output,
-                self.common.start_time.elapsed(),
+                self.common.comp.start_time.elapsed(),
                 Some(std::time::Duration::ZERO),
                 |_, _| Some(self.backend.output.clone()),
             )

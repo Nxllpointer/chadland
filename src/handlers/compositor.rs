@@ -5,7 +5,7 @@ use smithay::{
 
 impl<B: crate::Backend> CompositorHandler for crate::App<B> {
     fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
-        &mut self.common.wl.compositor
+        &mut self.common.comp.wl.compositor
     }
 
     fn client_compositor_state<'a>(

@@ -2,7 +2,7 @@ use smithay::wayland::dmabuf::DmabufHandler;
 
 impl<B: crate::Backend> DmabufHandler for crate::App<B> {
     fn dmabuf_state(&mut self) -> &mut smithay::wayland::dmabuf::DmabufState {
-        &mut self.common.wl.dmabuf
+        &mut self.common.comp.wl.dmabuf
     }
 
     fn dmabuf_imported(

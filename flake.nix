@@ -44,6 +44,7 @@
               libXcursor
               libxcb
               libXi
+              vulkan-loader
             ];
 
           LD_LIBRARY_PATH = lib.makeLibraryPath runtimeLibraries;

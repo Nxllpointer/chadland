@@ -23,7 +23,7 @@ impl<B: crate::Backend> crate::App<B> {
         match event {
             InputEvent::Basic(b_event) => match b_event {
                 smithay_input::InputEvent::Keyboard { event: k_event } => {
-                    if let Some(keyboard) = self.common.seat.get_keyboard() {
+                    if let Some(keyboard) = self.common.comp.seat.get_keyboard() {
                         keyboard.input(
                             self,
                             k_event.key_code(),
@@ -41,7 +41,7 @@ impl<B: crate::Backend> crate::App<B> {
     }
 
     pub fn set_focus(&mut self, focus: <Self as smithay_input::SeatHandler>::KeyboardFocus) {
-        if let Some(keyboard) = self.common.seat.get_keyboard() {
+        if let Some(keyboard) = self.common.comp.seat.get_keyboard() {
             keyboard.set_focus(self, Some(focus), SERIAL_COUNTER.next_serial());
         }
     }
