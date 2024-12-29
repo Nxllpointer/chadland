@@ -14,11 +14,12 @@ pub fn run<B: crate::Backend<SelfType = B>>() {
             event_loop.handle(),
             event_loop.get_signal(),
         ),
-        iced: futures::executor::block_on(crate::iced::State::new(
-            crate::shell::Shell::default(), 
+        iced: crate::iced::State::new(
+            crate::shell::Shell::default(),
             (500., 500.).into(), //TODO
-            event_loop.handle()
-        )),
+            futures::executor::block_on(crate::iced::wgpu::Objects::new()),
+            event_loop.handle(),
+        ),
     };
     let backend = B::new(&mut common);
 
