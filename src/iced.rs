@@ -1,5 +1,12 @@
 use futures::{FutureExt, StreamExt};
-use smithay::backend::allocator::dmabuf::Dmabuf;
+use smithay::{
+    backend::allocator::{
+        dmabuf::{AsDmabuf, Dmabuf},
+        gbm::GbmAllocator,
+        Swapchain,
+    },
+    reexports::gbm,
+};
 use std::marker::PhantomData;
 
 pub type Renderer = iced_wgpu::Renderer;
@@ -22,7 +29,10 @@ pub struct State<B: crate::Backend, P: Program<B>> {
     bounds: iced_core::Size,
     cache: iced_runtime::user_interface::Cache,
     device: wgpu::Device,
+    queue: wgpu::Queue,
     renderer: Renderer,
+    engine: iced_wgpu::Engine,
+    swapchain: Swapchain<GbmAllocator<std::fs::File>>,
     task_scheduler: calloop::futures::Scheduler<Option<iced_runtime::Action<P::Message>>>,
     event_sender: calloop::channel::Sender<iced_core::Event>,
     _b: PhantomData<B>,
@@ -38,8 +48,6 @@ impl<B: crate::Backend, P: Program<B, Message = crate::shell::Message>> State<B,
             backends: wgpu::Backends::VULKAN,
             ..Default::default()
         });
-
-        dbg!(instance.enumerate_adapters(wgpu::Backends::all()));
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -100,12 +108,33 @@ impl<B: crate::Backend, P: Program<B, Message = crate::shell::Message>> State<B,
                 .process_event(event, Some(&mut app.common.comp));
         });
 
+        // TODO
+        let gbm_device =
+            gbm::Device::new(std::fs::File::open("/dev/dri/card1").expect("Cant open drm device"))
+                .expect("Cant create gbm device");
+
+        let allocator = GbmAllocator::new(
+            gbm_device,
+            gbm::BufferObjectFlags::RENDERING | gbm::BufferObjectFlags::SCANOUT,
+        );
+
+        let swapchain = Swapchain::new(
+            allocator,
+            bounds.width as u32,
+            bounds.height as u32,
+            dmabuf::TEXTURE_FORMAT.2,
+            vec![drm_fourcc::DrmModifier::Linear],
+        );
+
         Self {
             program,
             bounds,
             cache: Default::default(),
             device,
+            queue,
             renderer,
+            engine,
+            swapchain,
             task_scheduler,
             event_sender,
             _b: Default::default(),
@@ -118,6 +147,8 @@ impl<B: crate::Backend, P: Program<B, Message = crate::shell::Message>> State<B,
 
     pub fn set_bounds(&mut self, bounds: impl Into<iced_core::Size>) {
         self.bounds = bounds.into();
+        self.swapchain
+            .resize(self.bounds.width as u32, self.bounds.height as u32);
     }
 
     pub fn schedule_task(&self, task: iced_runtime::Task<P::Message>) {
@@ -165,6 +196,44 @@ impl<B: crate::Backend, P: Program<B, Message = crate::shell::Message>> State<B,
         }
     }
 
+    pub fn render(&mut self, dmabuf: &Dmabuf) {
+        let texture = self.import_dmabuf(dmabuf);
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.with_ui(|ui, renderer| {
+            ui.draw(
+                renderer,
+                &iced_core::Theme::CatppuccinMocha,
+                &iced_core::renderer::Style::default(),
+                iced_core::mouse::Cursor::Unavailable,
+            );
+        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Iced render encoder"),
+            });
+
+        self.renderer.present(
+            &mut self.engine,
+            &self.device,
+            &self.queue,
+            &mut encoder,
+            None,
+            dmabuf::TEXTURE_FORMAT.1,
+            &texture_view,
+            &iced_wgpu::graphics::Viewport::with_physical_size(
+                (self.bounds.width as u32, self.bounds.height as u32).into(),
+                1.0,
+            ),
+            &[] as &[String],
+        );
+
+        let submission_index = self.engine.submit(&self.queue, encoder);
+        self.device
+            .poll(wgpu::Maintain::WaitForSubmissionIndex(submission_index));
+    }
+
     pub fn with_ui<T>(
         &mut self,
         func: impl FnOnce(
@@ -187,13 +256,22 @@ impl<B: crate::Backend, P: Program<B, Message = crate::shell::Message>> State<B,
     pub fn import_dmabuf(&self, dmabuf: &Dmabuf) -> wgpu::Texture {
         unsafe { dmabuf::texture_from_dmabuf(&self.device, dmabuf) }
     }
+
+    pub fn get_buffer(&mut self) -> Dmabuf {
+        self.swapchain
+            .acquire()
+            .expect("allocation error")
+            .expect("No free slot")
+            .export()
+            .expect("Cant export dambuf")
+    }
 }
 
 // TODO error handling
 mod dmabuf {
     use smithay::{
         backend::allocator::{dmabuf::Dmabuf, format::get_bpp, Buffer},
-        reexports::ash,
+        reexports::{ash, gbm::Format},
     };
     use std::os::fd::IntoRawFd;
 
@@ -202,18 +280,19 @@ mod dmabuf {
     const TEXTURE_DIMENSION: (ash::vk::ImageType, wgpu::TextureDimension) =
         (ash::vk::ImageType::TYPE_2D, wgpu::TextureDimension::D2);
     const ARRAY_LAYERS: u32 = 1;
-    const TEXTURE_FORMAT: (ash::vk::Format, wgpu::TextureFormat) = (
+    pub const TEXTURE_FORMAT: (ash::vk::Format, wgpu::TextureFormat, Format) = (
         ash::vk::Format::R8G8B8A8_UNORM,
         wgpu::TextureFormat::Rgba8Unorm,
+        Format::Abgr8888,
     );
     const USAGE: (
         ash::vk::ImageUsageFlags,
         wgpu::hal::TextureUses,
         wgpu::TextureUsages,
     ) = (
-        ash::vk::ImageUsageFlags::empty(),
-        wgpu::hal::TextureUses::empty(),
-        wgpu::TextureUsages::empty(),
+        ash::vk::ImageUsageFlags::COLOR_ATTACHMENT,
+        wgpu::hal::TextureUses::COLOR_TARGET,
+        wgpu::TextureUsages::RENDER_ATTACHMENT,
     );
 
     pub unsafe fn texture_from_dmabuf(device: &wgpu::Device, dmabuf: &Dmabuf) -> wgpu::Texture {
@@ -301,7 +380,7 @@ mod dmabuf {
             .mip_levels(MIP_LEVEL_COUNT)
             .array_layers(ARRAY_LAYERS)
             .samples(SAMPLE_COUNT.0)
-            .tiling(ash::vk::ImageTiling::OPTIMAL)
+            .tiling(ash::vk::ImageTiling::LINEAR)
             .usage(USAGE.0)
             .sharing_mode(ash::vk::SharingMode::EXCLUSIVE)
             .initial_layout(ash::vk::ImageLayout::UNDEFINED);

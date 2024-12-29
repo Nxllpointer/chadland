@@ -290,6 +290,7 @@ name = "chadland"
 version = "0.1.0"
 dependencies = [
  "calloop 0.14.2",
+ "drm-fourcc",
  "futures",
  "iced_core",
  "iced_runtime",

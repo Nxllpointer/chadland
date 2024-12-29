@@ -11,6 +11,7 @@ tracing-subscriber = "0.3.18"
 paste = "1.0.15"
 wgpu = "23.0.1"
 futures = { version = "0.3.31", features = [ "executor" ] }
+drm-fourcc = "2.2.0"
 
 iced_core = { git = "https://github.com/iced-rs/iced.git", rev = "f2c9b6b2ffc50d67d9789e77cb55eeb2a0ebe470", features = [ "advanced" ] }
 iced_runtime = { git = "https://github.com/iced-rs/iced.git", rev = "f2c9b6b2ffc50d67d9789e77cb55eeb2a0ebe470" }
