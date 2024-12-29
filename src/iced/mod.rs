@@ -1,14 +1,18 @@
 use futures::{FutureExt, StreamExt};
 use smithay::{
-    backend::allocator::{
-        dmabuf::{AsDmabuf, Dmabuf},
-        gbm::GbmAllocator,
-        Swapchain,
+    backend::{
+        allocator::{
+            dmabuf::{AsDmabuf, Dmabuf},
+            gbm::GbmAllocator,
+            Swapchain,
+        },
+        drm::DrmDeviceFd,
     },
     reexports::gbm,
 };
 use std::marker::PhantomData;
 
+mod drm;
 pub mod texture;
 pub mod wgpu;
 
@@ -34,7 +38,7 @@ pub struct State<B: crate::Backend, P: Program<B>> {
     wgpu_objects: wgpu::Objects,
     engine: iced_wgpu::Engine,
     renderer: Renderer,
-    swapchain: Swapchain<GbmAllocator<std::fs::File>>,
+    swapchain: Swapchain<GbmAllocator<DrmDeviceFd>>,
     task_scheduler: calloop::futures::Scheduler<Option<iced_runtime::Action<P::Message>>>,
     event_sender: calloop::channel::Sender<iced_core::Event>,
     _b: PhantomData<B>,
@@ -91,18 +95,13 @@ impl<B: crate::Backend, P: Program<B, Message = crate::shell::Message>> State<B,
                 .process_event(event, Some(&mut app.common.comp));
         });
 
-        // TODO
-        let gbm_device =
-            gbm::Device::new(std::fs::File::open("/dev/dri/card1").expect("Cant open drm device"))
-                .expect("Cant create gbm device");
-
-        let allocator = GbmAllocator::new(
-            gbm_device,
-            gbm::BufferObjectFlags::RENDERING | gbm::BufferObjectFlags::SCANOUT,
-        );
+        let gbm_device = gbm::Device::new(
+            drm::get_render_node(&wgpu_objects.device).expect("Unable to get render node"),
+        )
+        .expect("Cant create gbm device");
 
         let swapchain = Swapchain::new(
-            allocator,
+            GbmAllocator::new(gbm_device, gbm::BufferObjectFlags::RENDERING),
             bounds.width as u32,
             bounds.height as u32,
             texture::properties::TEXTURE_FORMAT.2,
@@ -250,5 +249,3 @@ impl<B: crate::Backend, P: Program<B, Message = crate::shell::Message>> State<B,
             .expect("Cant export dambuf")
     }
 }
-
-
