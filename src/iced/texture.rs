@@ -1,4 +1,4 @@
-use smithay::backend::allocator::{dmabuf::Dmabuf, format::get_bpp, Buffer};
+use smithay::backend::allocator::{dmabuf::Dmabuf, Buffer};
 use std::os::fd::IntoRawFd;
 
 /// Equivalent properties for different contexts
@@ -64,6 +64,8 @@ unsafe fn hal_from_dmabuf(
     wgpu::hal::vulkan::Texture,
     wgpu::hal::TextureDescriptor<'static>,
 ) {
+    let vk_device = device.raw_device();
+
     let dma_fd = dmabuf
         .handles()
         .last()
@@ -71,39 +73,25 @@ unsafe fn hal_from_dmabuf(
         .try_clone_to_owned()
         .expect("Cant clone dmabuf fd");
 
-    let vk_instance = device.shared_instance().raw_instance();
-    let vk_device = device.raw_device();
-    let vk_physical_device = device.raw_physical_device();
+    let mut external_memory_info = ash::vk::ExternalMemoryImageCreateInfo::default()
+        .handle_types(ash::vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT);
 
-    let memory_properties = vk_instance.get_physical_device_memory_properties(vk_physical_device);
-    let memory_type_index = memory_properties
-        .memory_types
-        .into_iter()
-        .enumerate()
-        .find(|(_, mem)| {
-            mem.property_flags
-                .contains(ash::vk::MemoryPropertyFlags::DEVICE_LOCAL)
+    let planes = dmabuf.offsets().zip(dmabuf.strides());
+    let plane_layouts: Vec<_> = planes
+        .map(|(offset, stride)| {
+            ash::vk::SubresourceLayout::default()
+                .offset(offset as u64)
+                .row_pitch(stride as u64)
         })
-        .expect("Unable to find memory type index")
-        .0;
+        .collect();
 
-    let mut import_memory_fd_info = ash::vk::ImportMemoryFdInfoKHR::default()
-        .handle_type(ash::vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT)
-        .fd(dma_fd.into_raw_fd());
-
-    let bytes_per_pixel = get_bpp(dmabuf.format().code).expect("Cant get bpp for dmabuf") / 8;
-    let size = dmabuf.width() * dmabuf.height() * bytes_per_pixel as u32;
-
-    let allocate_info = ash::vk::MemoryAllocateInfo::default()
-        .push_next(&mut import_memory_fd_info)
-        .allocation_size(size as u64)
-        .memory_type_index(memory_type_index as u32);
-
-    let memory = vk_device
-        .allocate_memory(&allocate_info, None)
-        .expect("Unable to import memory");
+    let mut drm_format_info = ash::vk::ImageDrmFormatModifierExplicitCreateInfoEXT::default()
+        .drm_format_modifier(dmabuf.format().modifier.into())
+        .plane_layouts(plane_layouts.as_slice());
 
     let image_info = ash::vk::ImageCreateInfo::default()
+        .push_next(&mut external_memory_info)
+        .push_next(&mut drm_format_info)
         .image_type(properties::TEXTURE_DIMENSION.0)
         .format(properties::TEXTURE_FORMAT.0)
         .mip_levels(properties::MIP_LEVEL_COUNT)
@@ -118,19 +106,32 @@ unsafe fn hal_from_dmabuf(
         .tiling(ash::vk::ImageTiling::LINEAR)
         .usage(properties::USAGE.0)
         .sharing_mode(ash::vk::SharingMode::EXCLUSIVE)
-        .initial_layout(ash::vk::ImageLayout::UNDEFINED);
+        .initial_layout(ash::vk::ImageLayout::PREINITIALIZED);
 
     let image = vk_device
         .create_image(&image_info, None)
-        .expect("Cant create image");
+        .expect("Unable to create image");
+
+    let image_requirements = vk_device.get_image_memory_requirements(image);
+
+    let memory_type_index = image_requirements.memory_type_bits.trailing_zeros();
+
+    let mut import_memory_info = ash::vk::ImportMemoryFdInfoKHR::default()
+        .handle_type(ash::vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT)
+        .fd(dma_fd.into_raw_fd());
+
+    let allocate_info = ash::vk::MemoryAllocateInfo::default()
+        .push_next(&mut import_memory_info)
+        .allocation_size(image_requirements.size)
+        .memory_type_index(memory_type_index);
+
+    let memory = vk_device
+        .allocate_memory(&allocate_info, None)
+        .expect("Unable to allocate memory");
 
     vk_device
-        .bind_image_memory(
-            image,
-            memory,
-            dmabuf.offsets().last().expect("No offset") as u64,
-        )
-        .expect("Unable to bind memory to image");
+        .bind_image_memory(image, memory, 0)
+        .expect("Unable to bind image memory");
 
     let texture_descriptor = wgpu::hal::TextureDescriptor {
         label: Some("Iced dmabuf imported texture"),
