@@ -120,8 +120,11 @@ unsafe fn hal_from_dmabuf(
         .handle_type(ash::vk::ExternalMemoryHandleTypeFlags::DMA_BUF_EXT)
         .fd(dma_fd.into_raw_fd());
 
+    let mut dedicated_allocate_info = ash::vk::MemoryDedicatedAllocateInfo::default().image(image);
+
     let allocate_info = ash::vk::MemoryAllocateInfo::default()
         .push_next(&mut import_memory_info)
+        .push_next(&mut dedicated_allocate_info)
         .allocation_size(image_requirements.size)
         .memory_type_index(memory_type_index);
 
