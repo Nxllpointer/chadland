@@ -13,7 +13,7 @@ use smithay::{
 use std::time::Duration;
 use tracing::error;
 
-const REFRESH_RATE: i32 = 60_000;
+const REFRESH_RATE: i32 = 60;
 
 pub type WinitApp = crate::App<WinitBackend>;
 
@@ -70,7 +70,7 @@ impl super::Backend for WinitBackend {
         output.change_current_state(
             Some(output::Mode {
                 size: winit.window_size(),
-                refresh: REFRESH_RATE,
+                refresh: REFRESH_RATE * 1000,
             }),
             // Everything is upside down without transform
             Some(smithay::utils::Transform::Flipped180),
@@ -125,7 +125,7 @@ impl WinitApp {
             } => self.backend.output.change_current_state(
                 Some(output::Mode {
                     size,
-                    refresh: REFRESH_RATE,
+                    refresh: REFRESH_RATE * 1000,
                 }),
                 None,
                 None,
