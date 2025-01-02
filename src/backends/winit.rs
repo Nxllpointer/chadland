@@ -2,14 +2,12 @@ use smithay::{
     backend::{
         allocator,
         egl::EGLDevice,
-        renderer::{
-            damage::OutputDamageTracker, element::surface::WaylandSurfaceRenderElement,
-            gles::GlesRenderer, ImportDma,
-        },
+        renderer::{damage::OutputDamageTracker, gles::GlesRenderer, Frame, ImportDma, Renderer},
         winit::{WinitEvent, WinitGraphicsBackend},
     },
-    desktop, output,
+    output,
     reexports::calloop,
+    utils::{Physical, Rectangle, Transform},
     wayland::dmabuf::DmabufFeedbackBuilder,
 };
 use std::time::Duration;
@@ -145,24 +143,54 @@ impl WinitApp {
     }
 
     fn render(&mut self) {
+        let win_size = self.backend.winit.window_size();
+        let win_rect =
+            Rectangle::<_, Physical>::from_loc_and_size((0, 0), (win_size.w, win_size.h));
+
+        let iced_dmabuf = self.common.shell_driver.render(
+            &self.common.comp,
+            (win_size.w as u32, win_size.h as u32).into(),
+        );
+
+        let renderer = self.backend.winit.renderer();
+        let iced_texture = renderer
+            .import_dmabuf(
+                &iced_dmabuf,
+                Some(&[win_rect.to_logical(1).to_buffer(
+                    1,
+                    Transform::Normal,
+                    &win_size.to_logical(1),
+                )]),
+            )
+            .expect("Cant import iced dmabuf into gles");
+
         self.backend.winit.bind().expect("Unable to bind backend");
 
-        let damage =
-            desktop::space::render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
-                &self.backend.output,
-                self.backend.winit.renderer(),
-                1.0,
-                0,
-                [&self.common.comp.space],
-                &[],
-                &mut self.backend.damage_tracker,
-                [1.0, 0.0, 1.0, 1.0],
-            )
-            .expect("Error rendering output")
-            .damage
-            .map(|d| d.as_slice());
+        let mut frame = self
+            .backend
+            .winit
+            .renderer()
+            .render(win_size, Transform::Flipped180)
+            .expect("Unable to create render frame");
 
-        self.backend.winit.submit(damage).unwrap();
+        frame
+            .render_texture_at(
+                &iced_texture,
+                (0, 0).into(),
+                1,
+                1.0,
+                Transform::Normal,
+                &[win_rect],
+                &[win_rect],
+                1.0,
+            )
+            .expect("Unable to render iced texture");
+        drop(frame);
+
+        self.backend
+            .winit
+            .submit(Some(&[win_rect]))
+            .expect("Unable to submit back buffer");
 
         self.common.comp.space.elements().for_each(|window| {
             // TODO this *should* only be run for visible surfaces

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use smithay::reexports::*;
 use tracing::info;
 
@@ -14,11 +16,18 @@ pub fn run<B: crate::Backend<SelfType = B>>() {
             event_loop.handle(),
             event_loop.get_signal(),
         ),
-        iced: crate::iced::State::new(
-            crate::shell::Shell::default(),
-            (500., 500.).into(), //TODO
-            futures::executor::block_on(crate::iced::wgpu::Objects::new()),
+        shell_driver: crate::iced::Driver::new(
+            Arc::new(futures::executor::block_on(
+                crate::iced::wgpu::Objects::new(),
+            )),
             event_loop.handle(),
+            |app| {
+                (
+                    &mut app.common.shell_driver,
+                    &mut app.common.comp,
+                    (500, 500).into(),
+                )
+            },
         ),
     };
     let backend = B::new(&mut common);

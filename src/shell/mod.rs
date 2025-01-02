@@ -1,24 +1,50 @@
-use iced_widget::*;
+use iced_core::{alignment::Vertical, Element, Length};
+use iced_widget::{button, column, horizontal_space, row, text, vertical_space};
+use std::marker::PhantomData;
 
-#[derive(Debug, Default)]
-pub struct Shell {}
+mod window;
 
 #[derive(Debug, Clone)]
 pub enum Message {}
 
-impl<B: crate::Backend> crate::iced::Program<B> for Shell {
+#[derive(Default)]
+pub struct Shell<B: crate::Backend>(PhantomData<B>);
+impl<B: crate::Backend> crate::iced::Program for Shell<B> {
+    type Data = crate::state::Compositor<B>;
     type Message = Message;
 
-    fn view(&self) -> impl Into<crate::iced::Element<'_, Self::Message>> {
-        button(text!("Hello world!"))
+    fn view(data: &Self::Data) -> impl Into<crate::iced::Element<'_, Self::Message>> {
+        Element::new(
+            column![
+                row(data.space.elements().map(|window| {
+                    iced_widget::column![
+                        text!("Top"),
+                        window::Window(window.clone()),
+                        text!("Bottom")
+                    ]
+                    .into()
+                })),
+                vertical_space(),
+                iced_widget::row![
+                    button(text!("Active windows: {}", data.space.elements().len())),
+                    horizontal_space(),
+                    text!(
+                        "Running for {} seconds",
+                        data.start_time.elapsed().as_secs()
+                    )
+                ]
+                .width(Length::Fill)
+                .align_y(Vertical::Center)
+            ]
+            .width(Length::Fill)
+            .height(Length::Fill),
+        )
+        .explain(iced_core::color!(0xFF0000))
     }
 
     fn update(
-        &mut self,
-        comp: &mut crate::state::Compositor<B>,
-        message: Self::Message,
+        _data: &mut Self::Data,
+        _message: Self::Message,
     ) -> impl Into<iced_runtime::Task<Self::Message>> {
-        
     }
-
 }

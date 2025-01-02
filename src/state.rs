@@ -11,7 +11,7 @@ pub struct App<B: crate::Backend> {
 
 pub struct Common<B: crate::Backend> {
     pub comp: Compositor<B>,
-    pub iced: crate::iced::State<B, crate::shell::Shell>,
+    pub shell_driver: crate::iced::Driver<crate::shell::Shell<B>>,
 }
 
 pub struct Compositor<B: crate::Backend> {
