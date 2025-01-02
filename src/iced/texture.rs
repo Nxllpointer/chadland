@@ -152,7 +152,23 @@ unsafe fn hal_from_dmabuf(
         view_formats: Vec::new(),
     };
 
-    let hal_texture = wgpu::hal::vulkan::Device::texture_from_raw(image, &texture_descriptor, None);
+    // ash::Device is very large, so we only copy the relevant handles instead of cloning
+    // Maybe ash will introduces an Arc or wgpu exposes the device in the drop callback
+    let drop_callback = {
+        let vk_device_handle = vk_device.handle();
+        let vk_destroy_image = vk_device.fp_v1_0().destroy_image;
+        let vk_free_memory = vk_device.fp_v1_0().free_memory;
+        move || {
+            vk_destroy_image(vk_device_handle, image, std::ptr::null());
+            vk_free_memory(vk_device_handle, memory, std::ptr::null());
+        }
+    };
+
+    let hal_texture = wgpu::hal::vulkan::Device::texture_from_raw(
+        image,
+        &texture_descriptor,
+        Some(Box::new(drop_callback)),
+    );
 
     (hal_texture, texture_descriptor)
 }
