@@ -103,10 +103,10 @@ unsafe fn hal_from_dmabuf(
             height: dmabuf.height(),
             depth: properties::ARRAY_LAYERS,
         })
-        .tiling(ash::vk::ImageTiling::LINEAR)
+        .tiling(ash::vk::ImageTiling::DRM_FORMAT_MODIFIER_EXT)
         .usage(properties::USAGE.0)
         .sharing_mode(ash::vk::SharingMode::EXCLUSIVE)
-        .initial_layout(ash::vk::ImageLayout::PREINITIALIZED);
+        .initial_layout(ash::vk::ImageLayout::UNDEFINED);
 
     let image = vk_device
         .create_image(&image_info, None)
