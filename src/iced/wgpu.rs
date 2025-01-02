@@ -63,7 +63,7 @@ fn create_hal_device(
     let vk_physical_device = adapter.raw_physical_device();
 
     let mut extensions = adapter.required_device_extensions(desc.required_features);
-    extensions.extend(ADDITIONAL_EXTENSIONS.clone().map(|e| {
+    extensions.extend(ADDITIONAL_EXTENSIONS.map(|e| {
         std::ffi::CStr::from_bytes_with_nul(e.as_bytes())
             .expect(&format!("Extension {e} has no null terminator"))
     }));
@@ -72,7 +72,7 @@ fn create_hal_device(
         adapter.physical_device_features(&extensions, desc.required_features);
 
     let extension_names: Vec<*const std::ffi::c_char> =
-        extensions.iter().cloned().map(|ext| ext.as_ptr()).collect();
+        extensions.iter().map(|ext| ext.as_ptr()).collect();
 
     let queue_info = ash::vk::DeviceQueueCreateInfo::default()
         .queue_family_index(0)

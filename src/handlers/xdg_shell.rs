@@ -21,26 +21,26 @@ impl<B: crate::Backend> XdgShellHandler for crate::App<B> {
 
     fn new_popup(
         &mut self,
-        surface: smithay::wayland::shell::xdg::PopupSurface,
-        positioner: smithay::wayland::shell::xdg::PositionerState,
+        _surfacee: smithay::wayland::shell::xdg::PopupSurface,
+        _positioner: smithay::wayland::shell::xdg::PositionerState,
     ) {
         todo!()
     }
 
     fn grab(
         &mut self,
-        surface: smithay::wayland::shell::xdg::PopupSurface,
-        seat: smithay::reexports::wayland_server::protocol::wl_seat::WlSeat,
-        serial: smithay::utils::Serial,
+        _surface: smithay::wayland::shell::xdg::PopupSurface,
+        _seat: smithay::reexports::wayland_server::protocol::wl_seat::WlSeat,
+        _serial: smithay::utils::Serial,
     ) {
         todo!()
     }
 
     fn reposition_request(
         &mut self,
-        surface: smithay::wayland::shell::xdg::PopupSurface,
-        positioner: smithay::wayland::shell::xdg::PositionerState,
-        token: u32,
+        _surface: smithay::wayland::shell::xdg::PopupSurface,
+        _positioner: smithay::wayland::shell::xdg::PositionerState,
+        _token: u32,
     ) {
         todo!()
     }
