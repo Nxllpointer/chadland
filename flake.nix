@@ -49,6 +49,7 @@
             ];
 
           LD_LIBRARY_PATH = lib.makeLibraryPath runtimeLibraries;
+          VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
         };
 
         formatter = pkgs.nixfmt-classic;
