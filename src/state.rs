@@ -10,6 +10,11 @@ pub struct App<B: crate::Backend> {
 }
 
 pub struct Common<B: crate::Backend> {
+    pub comp: Compositor<B>,
+    pub shell_driver: crate::iced::Driver<crate::shell::Shell<B>>,
+}
+
+pub struct Compositor<B: crate::Backend> {
     pub display_handle: wayland_server::DisplayHandle,
     pub loop_handle: calloop::LoopHandle<'static, crate::App<B>>,
     pub loop_signal: calloop::LoopSignal,
@@ -29,7 +34,7 @@ pub struct WaylandState<B: crate::Backend> {
     pub dmabuf: wayland::dmabuf::DmabufState,
 }
 
-impl<B: crate::Backend> Common<B> {
+impl<B: crate::Backend> Compositor<B> {
     pub fn new(
         display_handle: wayland_server::DisplayHandle,
         loop_handle: calloop::LoopHandle<'static, App<B>>,

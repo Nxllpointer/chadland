@@ -18,12 +18,14 @@ pub fn init_socket<B: crate::Backend>(
         ListeningSocketSource::new_auto().expect("Unable to create wayland socket");
 
     app.common
+        .comp
         .loop_handle
         .insert_source(listening_socket, |client, _, app| {
             let client_dbg = format!("{client:?}");
 
             if let Err(err) = app
                 .common
+                .comp
                 .display_handle
                 .insert_client(client, Arc::new(crate::state::ClientState::default()))
             {
@@ -45,6 +47,7 @@ pub fn init_socket<B: crate::Backend>(
     );
 
     app.common
+        .comp
         .loop_handle
         .insert_source(poll_source, move |_, _, app| {
             display.dispatch_clients(app)?;

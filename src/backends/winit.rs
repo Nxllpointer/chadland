@@ -1,21 +1,19 @@
-use std::time::Duration;
 use smithay::{
     backend::{
         allocator,
         egl::EGLDevice,
-        renderer::{
-            damage::OutputDamageTracker, element::surface::WaylandSurfaceRenderElement,
-            gles::GlesRenderer, ImportDma,
-        },
+        renderer::{damage::OutputDamageTracker, gles::GlesRenderer, Frame, ImportDma, Renderer},
         winit::{WinitEvent, WinitGraphicsBackend},
     },
-    desktop, output,
+    output,
     reexports::calloop,
+    utils::{Physical, Rectangle, Transform},
     wayland::dmabuf::DmabufFeedbackBuilder,
 };
+use std::time::Duration;
 use tracing::error;
 
-const REFRESH_RATE: i32 = 60_000;
+const REFRESH_RATE: i32 = 60;
 
 pub type WinitApp = crate::App<WinitBackend>;
 
@@ -33,6 +31,7 @@ impl super::Backend for WinitBackend {
             smithay::backend::winit::init::<GlesRenderer>().expect("Unable to initialize winit");
 
         common
+            .comp
             .loop_handle
             .insert_source(event_source, |winit_event, _, app| {
                 app.event_handler(winit_event)
@@ -41,6 +40,7 @@ impl super::Backend for WinitBackend {
 
         let redraw_delay = Duration::from_millis(1000 / REFRESH_RATE as u64);
         common
+            .comp
             .loop_handle
             .insert_source(
                 calloop::timer::Timer::from_duration(redraw_delay),
@@ -52,6 +52,7 @@ impl super::Backend for WinitBackend {
             .expect("Unable to insert redraw timer event source");
 
         common
+            .comp
             .seat
             .add_keyboard(smithay::input::keyboard::XkbConfig::default(), 500, 100)
             .expect("Unable to initialize keyboard");
@@ -69,7 +70,7 @@ impl super::Backend for WinitBackend {
         output.change_current_state(
             Some(output::Mode {
                 size: winit.window_size(),
-                refresh: REFRESH_RATE,
+                refresh: REFRESH_RATE * 1000,
             }),
             // Everything is upside down without transform
             Some(smithay::utils::Transform::Flipped180),
@@ -78,9 +79,9 @@ impl super::Backend for WinitBackend {
         );
         output.set_preferred(output.current_mode().expect("Output has no current mode"));
 
-        output.create_global::<WinitApp>(&common.display_handle);
+        output.create_global::<WinitApp>(&common.comp.display_handle);
 
-        common.space.map_output(&output, (0, 0));
+        common.comp.space.map_output(&output, (0, 0));
 
         let damage_tracker = OutputDamageTracker::from_output(&output);
 
@@ -124,7 +125,7 @@ impl WinitApp {
             } => self.backend.output.change_current_state(
                 Some(output::Mode {
                     size,
-                    refresh: REFRESH_RATE,
+                    refresh: REFRESH_RATE * 1000,
                 }),
                 None,
                 None,
@@ -134,36 +135,68 @@ impl WinitApp {
             smithay::backend::winit::WinitEvent::Input(event) => {
                 self.process_input(crate::input::InputEvent::Basic(event));
             }
-            smithay::backend::winit::WinitEvent::CloseRequested => self.common.loop_signal.stop(),
+            smithay::backend::winit::WinitEvent::CloseRequested => {
+                self.common.comp.loop_signal.stop()
+            }
             smithay::backend::winit::WinitEvent::Redraw => self.render(),
         }
     }
 
     fn render(&mut self) {
+        let win_size = self.backend.winit.window_size();
+        let win_rect =
+            Rectangle::<_, Physical>::from_loc_and_size((0, 0), (win_size.w, win_size.h));
+
+        let iced_dmabuf = self.common.shell_driver.render(
+            &self.common.comp,
+            (win_size.w as u32, win_size.h as u32).into(),
+        );
+
+        let renderer = self.backend.winit.renderer();
+        let iced_texture = renderer
+            .import_dmabuf(
+                &iced_dmabuf,
+                Some(&[win_rect.to_logical(1).to_buffer(
+                    1,
+                    Transform::Normal,
+                    &win_size.to_logical(1),
+                )]),
+            )
+            .expect("Cant import iced dmabuf into gles");
+
         self.backend.winit.bind().expect("Unable to bind backend");
 
-        let damage =
-            desktop::space::render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
-                &self.backend.output,
-                self.backend.winit.renderer(),
+        let mut frame = self
+            .backend
+            .winit
+            .renderer()
+            .render(win_size, Transform::Flipped180)
+            .expect("Unable to create render frame");
+
+        frame
+            .render_texture_at(
+                &iced_texture,
+                (0, 0).into(),
+                1,
                 1.0,
-                0,
-                [&self.common.space],
-                &[],
-                &mut self.backend.damage_tracker,
-                [1.0, 0.0, 1.0, 1.0],
+                Transform::Normal,
+                &[win_rect],
+                &[win_rect],
+                1.0,
             )
-            .expect("Error rendering output")
-            .damage
-            .map(|d| d.as_slice());
+            .expect("Unable to render iced texture");
+        drop(frame);
 
-        self.backend.winit.submit(damage).unwrap();
+        self.backend
+            .winit
+            .submit(Some(&[win_rect]))
+            .expect("Unable to submit back buffer");
 
-        self.common.space.elements().for_each(|window| {
+        self.common.comp.space.elements().for_each(|window| {
             // TODO this *should* only be run for visible surfaces
             window.send_frame(
                 &self.backend.output,
-                self.common.start_time.elapsed(),
+                self.common.comp.start_time.elapsed(),
                 Some(std::time::Duration::ZERO),
                 |_, _| Some(self.backend.output.clone()),
             )

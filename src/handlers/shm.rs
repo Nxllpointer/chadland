@@ -2,7 +2,7 @@ use smithay::wayland;
 
 impl<B: crate::Backend> wayland::shm::ShmHandler for crate::App<B> {
     fn shm_state(&self) -> &wayland::shm::ShmState {
-        &self.common.wl.shm
+        &self.common.comp.wl.shm
     }
 }
 

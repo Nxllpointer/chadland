@@ -9,38 +9,38 @@ use tracing::error;
 
 impl<B: crate::Backend> XdgShellHandler for crate::App<B> {
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
-        &mut self.common.wl.xdg_shell
+        &mut self.common.comp.wl.xdg_shell
     }
 
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         let wl_surface = surface.wl_surface().clone();
         let window = desktop::Window::new_wayland_window(surface);
-        self.common.space.map_element(window, (0, 0), true);
+        self.common.comp.space.map_element(window, (0, 0), true);
         self.set_focus(wl_surface);
     }
 
     fn new_popup(
         &mut self,
-        surface: smithay::wayland::shell::xdg::PopupSurface,
-        positioner: smithay::wayland::shell::xdg::PositionerState,
+        _surfacee: smithay::wayland::shell::xdg::PopupSurface,
+        _positioner: smithay::wayland::shell::xdg::PositionerState,
     ) {
         todo!()
     }
 
     fn grab(
         &mut self,
-        surface: smithay::wayland::shell::xdg::PopupSurface,
-        seat: smithay::reexports::wayland_server::protocol::wl_seat::WlSeat,
-        serial: smithay::utils::Serial,
+        _surface: smithay::wayland::shell::xdg::PopupSurface,
+        _seat: smithay::reexports::wayland_server::protocol::wl_seat::WlSeat,
+        _serial: smithay::utils::Serial,
     ) {
         todo!()
     }
 
     fn reposition_request(
         &mut self,
-        surface: smithay::wayland::shell::xdg::PopupSurface,
-        positioner: smithay::wayland::shell::xdg::PositionerState,
-        token: u32,
+        _surface: smithay::wayland::shell::xdg::PopupSurface,
+        _positioner: smithay::wayland::shell::xdg::PositionerState,
+        _token: u32,
     ) {
         todo!()
     }
@@ -53,12 +53,14 @@ pub fn handle_commit<B: crate::Backend>(app: &mut crate::App<B>, surface: &WlSur
     if !smithay::wayland::compositor::is_sync_subsurface(surface) {
         let root_surface = crate::util::surface::get_root_surface(surface);
 
-        if let Some(window) = crate::util::surface::find_window(&root_surface, &app.common.space) {
+        if let Some(window) =
+            crate::util::surface::find_window(&root_surface, &app.common.comp.space)
+        {
             window.on_commit();
         }
     }
 
-    if let Some(window) = crate::util::surface::find_window(surface, &app.common.space) {
+    if let Some(window) = crate::util::surface::find_window(surface, &app.common.comp.space) {
         if let Some(top_level) = window.toplevel() {
             let initial_configure_pending: Option<bool> = crate::util::surface::with_surface_data(
                 surface,

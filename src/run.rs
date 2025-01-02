@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use smithay::reexports::*;
 use tracing::info;
 
@@ -8,11 +10,26 @@ pub fn run<B: crate::Backend<SelfType = B>>() {
     let display: wayland_server::Display<crate::App<B>> =
         wayland_server::Display::new().expect("Unable to create wayland display");
 
-    let mut common = crate::state::Common::new(
-        display.handle(),
-        event_loop.handle(),
-        event_loop.get_signal(),
-    );
+    let mut common = crate::state::Common {
+        comp: crate::state::Compositor::new(
+            display.handle(),
+            event_loop.handle(),
+            event_loop.get_signal(),
+        ),
+        shell_driver: crate::iced::Driver::new(
+            Arc::new(futures::executor::block_on(
+                crate::iced::wgpu::Objects::new(),
+            )),
+            event_loop.handle(),
+            |app| {
+                (
+                    &mut app.common.shell_driver,
+                    &mut app.common.comp,
+                    (500, 500).into(),
+                )
+            },
+        ),
+    };
     let backend = B::new(&mut common);
 
     let mut app = crate::App { common, backend };
@@ -22,8 +39,9 @@ pub fn run<B: crate::Backend<SelfType = B>>() {
 
     event_loop
         .run(None, &mut app, |app| {
-            app.common.space.refresh();
+            app.common.comp.space.refresh();
             app.common
+                .comp
                 .display_handle
                 .flush_clients()
                 .expect("Unable to flush clients");
@@ -34,16 +52,17 @@ pub fn run<B: crate::Backend<SelfType = B>>() {
 fn init_dmabuf<B: crate::Backend>(app: &mut crate::App<B>) {
     if let Some(default_feedback) = app.backend.default_dmabuf_feedback() {
         app.common
+            .comp
             .wl
             .dmabuf
             .create_global_with_default_feedback::<crate::App<B>>(
-                &app.common.display_handle,
+                &app.common.comp.display_handle,
                 &default_feedback,
             );
         info!("Using DMA-Buf version >=4 with default feedback");
     } else {
-        app.common.wl.dmabuf.create_global::<crate::App<B>>(
-            &app.common.display_handle,
+        app.common.comp.wl.dmabuf.create_global::<crate::App<B>>(
+            &app.common.comp.display_handle,
             app.backend.dmabuf_formats(),
         );
         info!("Using DMA-Buf version <=3");

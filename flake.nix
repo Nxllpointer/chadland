@@ -35,6 +35,7 @@
               xwayland
               pixman
               libxkbcommon
+              fontconfig
           ];
 
           runtimeLibraries = with pkgs;
@@ -44,9 +45,11 @@
               libXcursor
               libxcb
               libXi
+              vulkan-loader
             ];
 
           LD_LIBRARY_PATH = lib.makeLibraryPath runtimeLibraries;
+          VK_LAYER_PATH = "${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d";
         };
 
         formatter = pkgs.nixfmt-classic;
