@@ -13,6 +13,7 @@ use smithay::{
 use std::sync::Arc;
 
 mod drm;
+pub mod scissors;
 pub mod texture;
 pub mod wgpu;
 

@@ -152,8 +152,10 @@ impl WinitApp {
             (win_size.w as u32, win_size.h as u32).into(),
         );
 
-        let renderer = self.backend.winit.renderer();
-        let iced_texture = renderer
+        let iced_texture = self
+            .backend
+            .winit
+            .renderer()
             .import_dmabuf(
                 &iced_dmabuf,
                 Some(&[win_rect.to_logical(1).to_buffer(
@@ -165,6 +167,23 @@ impl WinitApp {
             .expect("Cant import iced dmabuf into gles");
 
         self.backend.winit.bind().expect("Unable to bind backend");
+
+        let space_render_elements = self
+            .common
+            .comp
+            .space
+            .render_elements_for_output(self.backend.winit.renderer(), &self.backend.output, 1.0)
+            .expect("Unable to get space render elements");
+
+        self.backend
+            .damage_tracker
+            .render_output(
+                self.backend.winit.renderer(),
+                0,
+                &space_render_elements,
+                [1., 0., 1., 1.],
+            )
+            .expect("Unable to render space");
 
         let mut frame = self
             .backend
@@ -181,10 +200,11 @@ impl WinitApp {
                 1.0,
                 Transform::Normal,
                 &[win_rect],
-                &[win_rect],
+                &[],
                 1.0,
             )
             .expect("Unable to render iced texture");
+
         drop(frame);
 
         self.backend
