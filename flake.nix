@@ -22,7 +22,7 @@
 
         devShells.default = pkgs.mkShell rec {
           packages = with pkgs; [
-            rust-bin.nightly."2024-07-09".complete
+            rust-bin.nightly."2025-01-01".complete
             pkg-config
           ];
 
